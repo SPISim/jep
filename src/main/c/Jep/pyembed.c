@@ -158,14 +158,46 @@ static struct PyMethodDef jep_methods[] = {
     { NULL, NULL }
 };
 
+static void free_jep_module_state(JepModuleState* modState)
+{
+    Py_CLEAR(modState->pyJTypeCache);
+    Py_CLEAR(modState->PyJType_Type);
+    Py_CLEAR(modState->PyJField_Type);
+    Py_CLEAR(modState->PyJMethod_Type);
+    Py_CLEAR(modState->PyJConstructor_Type);
+    Py_CLEAR(modState->PyJMultiMethod_Type);
+    Py_CLEAR(modState->PyJObject_Type);
+    Py_CLEAR(modState->PyJClass_Type);
+    Py_CLEAR(modState->PyJArray_Type);
+    Py_CLEAR(modState->PyJMonitor_Type);
+    Py_CLEAR(modState->PyJArrayIter_Type);
+}
+
 static void free_jep_module(PyObject* modjep)
 {
     JepModuleState* modState = (JepModuleState*) PyModule_GetState(modjep);
     if (modState) {
-        Py_CLEAR(modState->PyJObject_Type);
-        Py_CLEAR(modState->PyJClass_Type);
-        Py_CLEAR(modState->PyJArray_Type);
+        free_jep_module_state(modState);
     }
+}
+
+static int traverse_jep_module(PyObject* modjep, visitproc visit, void *arg)
+{
+    JepModuleState* modState = (JepModuleState*) PyModule_GetState(modjep);
+    if (modState) {
+        Py_VISIT(modState->pyJTypeCache);
+        Py_VISIT(modState->PyJType_Type);
+        Py_VISIT(modState->PyJField_Type);
+        Py_VISIT(modState->PyJMethod_Type);
+        Py_VISIT(modState->PyJConstructor_Type);
+        Py_VISIT(modState->PyJMultiMethod_Type);
+        Py_VISIT(modState->PyJObject_Type);
+        Py_VISIT(modState->PyJClass_Type);
+        Py_VISIT(modState->PyJArray_Type);
+        Py_VISIT(modState->PyJMonitor_Type);
+        Py_VISIT(modState->PyJArrayIter_Type);
+    }
+    return 0;
 }
 
 static struct PyModuleDef jep_module_def = {
@@ -175,15 +207,39 @@ static struct PyModuleDef jep_module_def = {
     sizeof(JepModuleState),     /* m_size */
     jep_methods,                /* m_methods */
     NULL,                       /* m_reload */
-    NULL,                       /* m_traverse */
+    traverse_jep_module,        /* m_traverse */
     NULL,                       /* m_clear */
     (freefunc) free_jep_module, /* m_free */
 };
 
-static int pyjtypes_ready(PyObject *modjep)
+static int pyjtypes_ready(JepModuleState* modState)
 {
-    JepModuleState* modState = (JepModuleState*) PyModule_GetState(modjep);
-    if (!modState) {
+    modState->PyJType_Type = (PyTypeObject*) PyType_FromSpecWithBases(&PyJType_Spec,
+                             (PyObject*) &PyType_Type);
+    if (!modState->PyJType_Type) {
+        free_jep_module_state(modState);
+        return -1;
+    }
+    modState->PyJField_Type = (PyTypeObject*) PyType_FromSpec(&PyJField_Spec);
+    if (!modState->PyJField_Type) {
+        free_jep_module_state(modState);
+        return -1;
+    }
+    modState->PyJMethod_Type = (PyTypeObject*) PyType_FromSpec(&PyJMethod_Spec);
+    if (!modState->PyJMethod_Type) {
+        free_jep_module_state(modState);
+        return -1;
+    }
+    modState->PyJConstructor_Type = (PyTypeObject*) PyType_FromSpecWithBases(
+                                        &PyJConstructor_Spec, (PyObject*) modState->PyJMethod_Type);
+    if (!modState->PyJConstructor_Type) {
+        free_jep_module_state(modState);
+        return -1;
+    }
+    modState->PyJMultiMethod_Type = (PyTypeObject*) PyType_FromSpec(
+                                        &PyJMultiMethod_Spec);
+    if (!modState->PyJMultiMethod_Type) {
+        free_jep_module_state(modState);
         return -1;
     }
     modState->PyJObject_Type = (PyTypeObject*) PyType_FromSpec(&PyJObject_Spec);
@@ -193,14 +249,22 @@ static int pyjtypes_ready(PyObject *modjep)
     modState->PyJClass_Type = (PyTypeObject*) PyType_FromSpecWithBases(
                                   &PyJClass_Spec, (PyObject*) modState->PyJObject_Type);
     if (!modState->PyJClass_Type) {
-        Py_CLEAR(modState->PyJObject_Type);
+        free_jep_module_state(modState);
         return -1;
     }
     modState->PyJArray_Type = (PyTypeObject*) PyType_FromSpecWithBases(
                                   &PyJArray_Spec, (PyObject*) modState->PyJObject_Type);
     if (!modState->PyJArray_Type) {
-        Py_CLEAR(modState->PyJObject_Type);
-        Py_CLEAR(modState->PyJClass_Type);
+        free_jep_module_state(modState);
+        return -1;
+    }
+    modState->PyJMonitor_Type = (PyTypeObject*) PyType_FromSpec(&PyJMonitor_Spec);
+    if (!modState->PyJMonitor_Type) {
+        return -1;
+    }
+    modState->PyJArrayIter_Type = (PyTypeObject*) PyType_FromSpec(
+                                      &PyJArrayIter_Spec);
+    if (!modState->PyJArrayIter_Type) {
         return -1;
     }
     return 0;
@@ -257,11 +321,19 @@ static int initjep(JNIEnv *env, jboolean hasSharedModules)
             Py_INCREF(mainThreadModulesLock);
             PyModule_AddObject(modjep, "mainInterpreterModulesLock", mainThreadModulesLock);
         }
-        if (pyjtypes_ready(modjep)) {
+        JepModuleState* modState = (JepModuleState*) PyModule_GetState(modjep);
+        if (!modState) {
+            Py_DECREF(modjep);
+            handle_startup_exception(env, "Failed to initialize module state", 1);
+            return -1;
+        }
+        if (pyjtypes_ready(modState)) {
             Py_DECREF(modjep);
             handle_startup_exception(env, "Failed to initialize PyJTypes", 1);
             return -1;
         }
+        Py_INCREF(javaTypeCache);
+        modState->pyJTypeCache = javaTypeCache;
 
         /* still held by sys.modules. */
         Py_DECREF(modjep);
@@ -441,7 +513,7 @@ void pyembed_startup(JNIEnv *env,
     }
 
     /*
-     * Save a global reference to the sys.modules form the main thread to
+     * Save a global reference to the sys.modules from the main thread to
      * support shared modules
      */
     sysModule = PyImport_ImportModule("sys");
