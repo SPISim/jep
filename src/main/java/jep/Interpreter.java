@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2019 JEP AUTHORS.
+ * Copyright (c) 2019-2025 JEP AUTHORS.
  *
  * This file is licensed under the the zlib/libpng License.
  *
@@ -334,6 +334,51 @@ public interface Interpreter extends AutoCloseable {
      *             if an error occurs
      */
     public void set(String name, Object v) throws JepException;
+
+    /**
+     * <p>
+     * Attach the currently executing thread to the interpreter state for this
+     * Interpreter. The returned Interpreter will share state with this
+     * interpreter including <code>sys.modules</code> and other internal Python
+     * structures including the GIL. {@link PyObject}s can be used on any thread
+     * attached to the same interpreter state.
+     * </p>
+     * <p>
+     * When this is used with a {@link SharedInterpreter} it is identical to
+     * creating a new SharedInterpreter except it adds the ability to share
+     * global variables between Interpreters.
+     * </p>
+     * When this is used with a {@link SubInterpreter} then all Interpreters
+     * created from the same SubInterpreter have sharing between each other but
+     * are still isolated from other Interpreters. If the original
+     * SubInterpreter is closed while other threads are attached to the
+     * interpreter state then the state remains open until the last attached
+     * interpreter is closed.
+     * </p>
+     * <p>
+     * Concurrency between threads attached to the same interpreter state works
+     * just like threads created using the <code>threading</code> module and
+     * synchronization mechanisms from that module may be used to control
+     * concurrency.
+     * </p>
+     * <p>
+     * Unlike most Interpreter methods this method must be called from a
+     * different thread then the thread where the existing Interpreter is
+     * running. The new Interpreter can only be used on the thread where it was
+     * created and must be closed when it is no longer used. A thread can only
+     * be attached to one interpreter at a time and must be closed before it can
+     * be attached to a different Interpreter.
+     * </p>
+     * 
+     * @param shareGlobals
+     *            If true then the globals of the new interpreter will be the
+     *            same dict as this interpreter. If false the new interpreter
+     *            will have it's own independent globals.
+     * @return a new Interpreter valid on the current thread which shares state
+     *         with this Interpreter.
+     * @since 4.3
+     */
+    public Interpreter attach(boolean shareGlobals);
 
     @Override
     public void close() throws JepException;
