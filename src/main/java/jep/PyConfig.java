@@ -262,7 +262,7 @@ public class PyConfig {
     }
 
     /**
-     * If false, Python won’t try to write .pyc files on the import of source
+     * If false, Python won't try to write .pyc files on the import of source
      * modules.
      * 
      * @param writeBytecode
