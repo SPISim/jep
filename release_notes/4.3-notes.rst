@@ -17,7 +17,7 @@ before for now but they will be removed in a future release.
 Share Interpreter State between Threads
 ***************************************
 It is now possible to attach multiple threads to an existing Interpreter using
-`Interpreter.attach() <https://ninia.github.io/jep/javadoc/4.3/jep/Interpreter.html#attach-boolean->`.
+`Interpreter.attach() <https://ninia.github.io/jep/javadoc/4.3/jep/Interpreter.html#attach-boolean->`_.
 Interpreters created this way will share state such as ``sys.modules`` and
 even have the option to share globals which allows multiple threads to have
 identical access to an interpreter.
