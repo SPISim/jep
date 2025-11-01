@@ -279,29 +279,29 @@ class build_jar(Command):
             if not os.path.exists(dest_dir):
                 os.makedirs(dest_dir)
             shutil.copy(src, dest)
-
+ 
         self.setup_meta_inf(os.path.join('build', 'java'))
 
-        self.spawn([self.jar, '-c',
-                    f'--file=build/java/jep-{self.version}-sources.jar',
+        self.spawn([self.jar, '-cf',
+                    f'build/java/jep-{self.version}-sources.jar',
                     '-C','build/java/jep.src/main/java', 'jep',
                     '-C', 'build/java', 'META-INF'
         ])
-        self.spawn([self.jar, '-c',
-                    f'--file=build/java/jep-{self.version}.jar',
-                    '--main-class=jep.Run',
-                    '--manifest=build/java/MANIFEST-ADD.MF',
+        self.spawn([self.jar, '-cfem',
+                    f'build/java/jep-{self.version}.jar',
+                    'jep.Run',
+                    'build/java/MANIFEST-ADD.MF',
                     '-C', 'build/java', 'jep',
                     '-C', 'build/java', 'META-INF'
         ])
-        self.spawn([self.jar, '-c', 
-                    f'--file=build/java/jep-{self.version}-test-sources.jar',
+        self.spawn([self.jar, '-cf', 
+                    f'build/java/jep-{self.version}-test-sources.jar',
                     '-C', 'build/java/jep.test.src/test/java', 'jep',
                     '-C', 'build/java', 'META-INF'
         ])
-        self.spawn([self.jar, '-c',
-                    f'--file=build/java/jep-{self.version}-test.jar',
-                    '--main-class=test.jep.Test',
+        self.spawn([self.jar, '-cfe',
+                    f'build/java/jep-{self.version}-test.jar',
+                    'test.jep.Test',
                     '-C', 'build/java/test', 'jep',
                     '-C', 'build/java', 'META-INF'
         ])
